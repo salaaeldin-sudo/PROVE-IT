@@ -1,14 +1,14 @@
 # PROVE IT — Day 01: Find the Problem
 
-مهمة Day 01 من مسابقة PROVE IT (Arabian Academy — AI Engineering Track): اكتشاف وإصلاح Bug مخفي في كود Python بسيط لـ AI Pipeline.
+Day 01 mission from the PROVE IT competition (Arabian Academy — AI Engineering Track): find and fix a hidden bug in a simple Python AI pipeline.
 
-## الكود الأصلي (`before`)
+## Original Code (`before`)
 
-كلاس `SimpleAIPipeline` بيستقبل prompt من المستخدم، يتأكد من طوله، ويسجّله في `history`، وفيه دالة `get_average_prompt_length()` بتحسب متوسط أطوال الـprompts السابقة.
+The `SimpleAIPipeline` class receives a user prompt, validates its length, stores it in `history`, and has a `get_average_prompt_length()` method that computes the average length of previous prompts.
 
-## الـBug
+## The Bug
 
-`get_average_prompt_length()` بتقسم `total_length` على `len(self.history)` من غير ما تتأكد إن فيه بيانات أصلًا:
+`get_average_prompt_length()` divides `total_length` by `len(self.history)` without checking whether there's any data at all:
 
 ```python
 def get_average_prompt_length(self):
@@ -16,17 +16,17 @@ def get_average_prompt_length(self):
     return total_length / len(self.history)
 ```
 
-لو الدالة اتنادى قبل أي `process_input()`، `self.history` بتبقى `[]`، يبقى `len(self.history) = 0`، ويحصل:
+If the method is called before any `process_input()` call, `self.history` is `[]`, so `len(self.history) = 0`, and this happens:
 
 ```
 ZeroDivisionError: division by zero
 ```
 
-**الإثبات:** اتشغّل الكود فعليًا — إنشاء `SimpleAIPipeline` جديدة، ونداء مباشر على `get_average_prompt_length()` من غير أي prompt قبلها، والكود كرش فورًا بنفس الـError.
+**Proof:** verified by actually running the code — a fresh `SimpleAIPipeline` instance, then calling `get_average_prompt_length()` directly with no prior prompt. The code crashed immediately with the exact same error.
 
-**ليه مهم في الإنتاج:** أي جزء تاني في السيستم (زي dashboard أو monitoring tool) ممكن ينادي على الدالة دي قبل ما أول request يوصل، فالسيرفس كله يقع من أول ثانية.
+**Why it matters in production:** any other part of the system (a dashboard, a monitoring tool) could call this method before the first real request ever arrives, taking down the whole service from the very first second.
 
-## الحل (`after`)
+## The Fix (`after`)
 
 ```python
 def get_average_prompt_length(self):
@@ -36,21 +36,21 @@ def get_average_prompt_length(self):
     return total_length / len(self.history)
 ```
 
-guard clause بيتحقق لو الـhistory فاضية قبل القسمة، ويرجّع `0.0` بدل الكراش — ده بيعالج سبب المشكلة (غياب الـvalidation)، مش مجرد `try/except` بيغطي الـException بعد حدوثها.
+A guard clause checks whether `history` is empty before dividing, and returns `0.0` instead of crashing — this fixes the root cause (missing validation) instead of just wrapping it in a `try/except` that catches the exception after it happens.
 
-## تحسينات إضافية اتعملت في `after`
+## Additional Improvements Made in `after`
 
-| التحسين | ليه |
+| Improvement | Why |
 |---|---|
-| تأكيد إن الـinput أصلًا `string` | كان بيكرش بـ `AttributeError` مع `None` |
-| تقدير Tokens حقيقي بدل عدّ Characters | `max_tokens` كان بيقيس حروف مش Tokens فعلية |
-| `deque(maxlen=...)` بدل `list` عادية | يمنع Memory Leak من history بتكبر من غير حد |
-| كل الأخطاء بترجع dict `{"status": "error", ...}` | يوحّد شكل الأخطاء مع شكل النجاح، بدل `raise` غير متسق |
-| شيل `import json` غير المستخدم + `sum()` بقت generator | تنظيف الكود وتوفير ميموري |
+| Confirm the input is actually a `string` | Previously crashed with `AttributeError` on `None` |
+| Real token estimate instead of counting characters | `max_tokens` was measuring characters, not actual tokens |
+| `deque(maxlen=...)` instead of a plain `list` | Prevents a memory leak from history growing without bound |
+| All errors return a `{"status": "error", ...}` dict | Makes the error shape consistent with the success shape, instead of an inconsistent `raise` |
+| Removed unused `import json` + `sum()` now uses a generator | Cleans up the code and saves memory |
 
-## الملفات
+## Files
 
-| الملف | الوصف |
+| File | Description |
 |---|---|
-| `simple_ai_pipeline_before.py` / `.ipynb` | الكود الأصلي زي ما هو في المهمة |
-| `simple_ai_pipeline_after.py` / `.ipynb` | الكود بعد كل التعديلات، وكل تعديل معلّق عليه بالـليه |
+| `simple_ai_pipeline_before.py` / `.ipynb` | The original code exactly as given in the mission |
+| `simple_ai_pipeline_after.py` / `.ipynb` | The code after all fixes, with each change commented with its reasoning |
